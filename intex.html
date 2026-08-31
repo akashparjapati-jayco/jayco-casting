@@ -1,0 +1,1378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JAYCO Casting & Pattern Control</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<style>
+:root{
+  --bg:#edf0f2; --fg:#1e292f; --card:#fff; --red:#c9232d; --red-dark:#aa1d25;
+  --dark:#182126; --border:#d7dee2; --muted:#66737b; --radius:.35rem;
+  --font:"Arial Narrow","Roboto Condensed",Arial,Helvetica,sans-serif;
+  --mono:"Roboto Mono","IBM Plex Mono",Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font);font-size:14px}
+button,input,textarea,select{font:inherit}
+a{color:inherit}
+
+/* ---------- layout ---------- */
+.shell{display:flex;min-height:100vh}
+.sidebar{width:250px;flex:0 0 250px;background:var(--dark);color:#fff;display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
+.sidebar-head{border-bottom:1px solid rgba(255,255,255,.1);padding:1rem;display:flex;align-items:center;gap:.75rem}
+.logo-box{width:40px;height:40px;background:var(--red);display:grid;place-items:center;font-weight:900;font-size:1.15rem}
+.sidebar-head p:first-of-type{margin:0;font-size:.85rem;font-weight:700;letter-spacing:.03em}
+.sidebar-head p:last-of-type{margin:.15rem 0 0;font-size:.6rem;text-transform:uppercase;letter-spacing:.18em;color:rgba(255,255,255,.45)}
+.sidebar-body{flex:1;overflow-y:auto;padding:.75rem 0}
+.nav-label{font-size:.62rem;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.4);padding:.6rem 1rem .35rem}
+.nav-btn{width:100%;display:flex;align-items:center;justify-content:space-between;gap:.6rem;background:none;border:0;color:rgba(255,255,255,.75);padding:.6rem 1rem;cursor:pointer;text-align:left;font-size:.85rem}
+.nav-btn:hover{background:rgba(255,255,255,.1);color:#fff}
+.nav-btn.active{background:var(--red);color:#fff;font-weight:600}
+.nav-btn .count{font-family:var(--mono);font-size:.72rem;opacity:.55}
+.nav-sep{height:1px;background:rgba(255,255,255,.1);margin:.6rem 0}
+.sidebar-foot{border-top:1px solid rgba(255,255,255,.1);padding:1rem;font-size:.72rem;color:rgba(255,255,255,.55)}
+.sidebar-foot small{display:block;margin-top:.3rem;font-size:.62rem;line-height:1.35;color:rgba(255,255,255,.35)}
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.topbar{position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:.75rem;min-height:64px;background:#fff;border-bottom:1px solid var(--border);padding:0 1.25rem;box-shadow:0 1px 2px rgba(16,24,40,.04)}
+.topbar .title{flex:1;min-width:0}
+.topbar .title b{display:block;font-size:.9rem;color:#1f2c33}
+.topbar .title span{display:block;font-size:.75rem;color:var(--muted)}
+.content{padding:1.25rem;max-width:1700px;width:100%}
+.hamburger{display:none}
+
+/* ---------- shared bits ---------- */
+.eyebrow{font-size:.67rem;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:#7b8991;margin:0}
+.page-head{margin-bottom:1.25rem;display:flex;flex-wrap:wrap;gap:.75rem;justify-content:space-between;align-items:center;background:#fff;border-left:4px solid var(--red);padding:1rem 1.25rem;box-shadow:0 1px 2px rgba(16,24,40,.04)}
+.page-head h1{margin:.4rem 0 .2rem;font-size:1.4rem;font-weight:600;letter-spacing:-.01em}
+.page-head p.desc{margin:0;font-size:.85rem;color:var(--muted)}
+.data-panel{overflow:hidden;border:1px solid var(--border);background:#fff;box-shadow:0 1px 2px rgba(16,24,40,.04);margin-bottom:1.25rem}
+.panel-heading{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:1rem;border-bottom:1px solid var(--border);padding:1rem}
+.panel-title{margin:.35rem 0 0;font-size:1rem;font-weight:700;color:#26343b}
+.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:.75rem;margin-bottom:1.25rem}
+.metric-card{min-height:132px;border:1px solid var(--border);padding:1rem;background:#fff;box-shadow:0 1px 2px rgba(16,24,40,.04)}
+.metric-card.dark{border-color:var(--dark);background:var(--dark);color:#fff}
+.metric-card.red{border-color:var(--red);background:var(--red);color:#fff}
+.metric-card .lbl{font-size:.66rem;font-weight:800;letter-spacing:.14em;text-transform:uppercase;opacity:.7;margin:0}
+.metric-card .val{margin:1.1rem 0 0;font-family:var(--mono);font-size:1.75rem;font-weight:600;letter-spacing:-.02em}
+.metric-card .note{margin:.4rem 0 0;font-size:.75rem;opacity:.65}
+.two-col{display:grid;grid-template-columns:1.45fr .75fr;gap:1.25rem}
+.weight-total-card{border:1px solid var(--border);background:#f8fafc;padding:.9rem 1rem}
+.weight-total-card span{display:block;font-size:.65rem;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#718087}
+.weight-total-card strong{display:block;margin-top:.45rem;font-family:var(--mono);font-size:1.1rem}
+.weight-total-card.actual{border-color:var(--dark);background:var(--dark)}
+.weight-total-card.actual span{color:rgba(255,255,255,.55)}
+.weight-total-card.actual strong{color:#fff}
+.weight-total-card.diff-up{border-color:#fecaca;background:#fef2f2}
+.weight-total-card.diff-up strong{color:#b91c1c}
+.weight-total-card.diff-ok{border-color:#bbf7d0;background:#f0fdf4}
+.weight-total-card.diff-ok strong{color:#047857}
+.totals-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:.75rem;margin-top:1.25rem}
+
+/* ---------- buttons / inputs ---------- */
+.btn{display:inline-flex;align-items:center;gap:.4rem;border:1px solid var(--border);background:#fff;color:#1f2c33;padding:.45rem .8rem;border-radius:var(--radius);cursor:pointer;font-size:.82rem;font-weight:600;white-space:nowrap}
+.btn:hover{background:#f1f4f6}
+.btn.primary{background:var(--red);border-color:var(--red);color:#fff}
+.btn.primary:hover{background:var(--red-dark)}
+.btn.green{border-color:#a7d8bd;color:#047857}
+.btn.green:hover{background:#f0fdf4}
+.btn.icon{padding:.35rem .5rem;font-size:.9rem;line-height:1}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.danger{color:#b91c1c;border-color:#f3c6c6}
+label.field{display:block;font-size:.76rem;font-weight:700;color:#44535b}
+input[type=text],input[type=number],input[type=date],select,textarea{width:100%;margin-top:.35rem;border:1px solid #cbd4d9;border-radius:var(--radius);padding:.45rem .6rem;background:#fff;color:var(--fg)}
+input:focus,select:focus,textarea:focus{outline:2px solid rgba(201,35,45,.35);outline-offset:0;border-color:var(--red)}
+textarea{min-height:70px;resize:vertical}
+.search-wrap{position:relative;max-width:320px;width:100%}
+.search-wrap input{margin-top:0;padding-left:2rem}
+.search-wrap::before{content:"⌕";position:absolute;left:.6rem;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:1.1rem}
+
+/* ---------- tables ---------- */
+.table-scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:.82rem}
+thead th{background:#f6f8f9;text-align:left;font-weight:700;color:#4a585f;padding:.6rem .7rem;border-bottom:1px solid var(--border);white-space:nowrap;font-size:.74rem;text-transform:uppercase;letter-spacing:.04em}
+tbody td{padding:.55rem .7rem;border-bottom:1px solid #eceff1;vertical-align:top}
+tbody tr:hover{background:#fafbfc}
+.num{text-align:right;font-family:var(--mono)}
+th.num{text-align:right}
+.mono{font-family:var(--mono);font-size:.78rem;font-weight:600}
+.empty-row td{text-align:center;color:#7b8991;padding:2.5rem 1rem}
+.badge{display:inline-block;border:1px solid;border-radius:999px;padding:.1rem .55rem;font-size:.7rem;font-weight:700}
+.badge.ok{border-color:#a7f3d0;background:#ecfdf5;color:#047857}
+.badge.warn{border-color:#fde68a;background:#fffbeb;color:#b45309}
+.badge.bad{border-color:#fecaca;background:#fef2f2;color:#b91c1c}
+.badge.neutral{border-color:var(--border);background:#f6f8f9;color:#5b6a72}
+
+/* ---------- forms ---------- */
+.form-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.1rem;padding:1.25rem;border-bottom:1px solid var(--border)}
+.po-block{grid-column:1/-1;border:1px solid var(--border);background:#f8fafc;padding:1rem;border-radius:var(--radius)}
+.po-row{display:grid;grid-template-columns:1fr 14rem auto;gap:.75rem;align-items:end;background:#fff;border:1px solid var(--border);padding:.75rem;border-radius:var(--radius);margin-bottom:.6rem}
+.form-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:.5rem;border-top:1px solid var(--border);background:#f8fafc;padding:1rem}
+.item-table-wrap{border:1px solid var(--border);border-radius:var(--radius);overflow-x:auto}
+.item-table input,.item-table select{margin-top:0;font-size:.8rem;padding:.35rem .45rem}
+.item-table td{vertical-align:top}
+.progress{height:8px;background:#e6eaec;border-radius:99px;overflow:hidden;margin-top:.4rem}
+.progress > i{display:block;height:100%;background:var(--red)}
+.progress.dark > i{background:var(--dark)}
+
+/* ---------- modal ---------- */
+.modal-back{position:fixed;inset:0;background:rgba(15,23,32,.55);display:none;align-items:flex-start;justify-content:center;padding:2rem 1rem;z-index:60;overflow-y:auto}
+.modal-back.open{display:flex}
+.modal{background:#fff;border-radius:var(--radius);width:100%;max-width:44rem;box-shadow:0 20px 50px rgba(0,0,0,.25)}
+.modal.wide{max-width:64rem}
+.modal-head{padding:1.25rem 1.25rem .5rem}
+.modal-head h3{margin:0;font-size:1.05rem}
+.modal-head p{margin:.35rem 0 0;font-size:.82rem;color:var(--muted)}
+.modal-body{padding:1rem 1.25rem;display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+.modal-body.single{display:block}
+.modal-body .full{grid-column:1/-1}
+.modal-foot{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:.5rem;padding:1rem 1.25rem 1.25rem;border-top:1px solid var(--border)}
+
+/* ---------- toast ---------- */
+#toasts{position:fixed;top:1rem;right:1rem;z-index:100;display:flex;flex-direction:column;gap:.5rem}
+.toast{background:#fff;border-left:4px solid var(--dark);box-shadow:0 8px 24px rgba(0,0,0,.14);padding:.7rem .9rem;font-size:.83rem;min-width:250px;max-width:360px;border-radius:var(--radius)}
+.toast.success{border-left-color:#059669}
+.toast.error{border-left-color:var(--red)}
+.toast.info{border-left-color:#0284c7}
+
+/* ---------- gate screens ---------- */
+#gate{position:fixed;inset:0;background:var(--dark);color:#fff;z-index:200;display:flex;align-items:center;justify-content:center;padding:1.5rem}
+#gate .box{background:#fff;color:var(--fg);width:100%;max-width:420px;box-shadow:0 24px 60px rgba(0,0,0,.4)}
+#gate .box-head{background:var(--dark);color:#fff;padding:1.25rem;display:flex;align-items:center;gap:.75rem}
+#gate .box-head .logo-box{width:36px;height:36px}
+#gate .box-head b{display:block;font-size:.9rem;letter-spacing:.03em}
+#gate .box-head span{display:block;font-size:.6rem;text-transform:uppercase;letter-spacing:.18em;color:rgba(255,255,255,.45)}
+#gate .box-body{padding:1.25rem}
+#gate .box-body h2{margin:0 0 .3rem;font-size:1.05rem}
+#gate .box-body p.sub{margin:0 0 1.1rem;font-size:.82rem;color:var(--muted)}
+#gate label.field{margin-bottom:.9rem;display:block}
+#gate .err{background:#fef2f2;border-left:3px solid var(--red);color:#b91c1c;padding:.6rem .75rem;font-size:.8rem;margin-bottom:.9rem;display:none}
+#gate .err.show{display:block}
+#gate code{background:#f1f4f6;padding:.1rem .3rem;font-family:var(--mono);font-size:.75rem}
+#gate ol{margin:.5rem 0 0;padding-left:1.1rem;font-size:.8rem;line-height:1.7;color:#44535b}
+.user-chip{font-size:.72rem;color:rgba(255,255,255,.75);word-break:break-all}
+
+/* ---------- responsive ---------- */
+@media(max-width:1100px){.two-col{grid-template-columns:1fr}.metrics{grid-template-columns:repeat(2,1fr)}.form-grid{grid-template-columns:repeat(2,1fr)}.totals-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:820px){
+  .sidebar{position:fixed;left:0;top:0;transform:translateX(-100%);transition:transform .2s;z-index:70}
+  .sidebar.open{transform:none}
+  .hamburger{display:inline-flex}
+  .form-grid{grid-template-columns:1fr}
+  .po-row{grid-template-columns:1fr}
+  .modal-body{grid-template-columns:1fr}
+  .topbar .title span{display:none}
+  .content{padding:.9rem}
+}
+</style>
+</head>
+<body>
+
+<!-- ============ LOGIN / CONFIG GATE ============ -->
+<div id="gate">
+  <div class="box">
+    <div class="box-head">
+      <div class="logo-box">J</div>
+      <div><b>JAYCO ENGINEERING</b><span>Casting control system</span></div>
+    </div>
+    <div class="box-body" id="gate-body">
+      <h2>Connecting…</h2>
+      <p class="sub">Starting Firebase.</p>
+    </div>
+  </div>
+</div>
+
+<div class="shell">
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-head">
+      <div class="logo-box">J</div>
+      <div style="min-width:0">
+        <p>JAYCO ENGINEERING</p>
+        <p>Casting control system</p>
+      </div>
+    </div>
+    <div class="sidebar-body">
+      <div class="nav-label">Operations</div>
+      <button class="nav-btn" data-view="dashboard"><span>▤ Dashboard</span></button>
+      <button class="nav-btn" data-view="casting-records"><span>▤ Casting Management</span><span class="count" id="c-challans">0</span></button>
+      <button class="nav-btn" data-view="pattern-management"><span>▤ Pattern Management</span><span class="count" id="c-patrec">0</span></button>
+      <button class="nav-btn" data-view="insert-casting"><span>▤ Insert Casting Details</span></button>
+      <div class="nav-sep"></div>
+      <div class="nav-label">Masters</div>
+      <button class="nav-btn" data-view="pattern-master"><span>▤ Pattern Master</span><span class="count" id="c-patmas">0</span></button>
+      <button class="nav-btn" data-view="casting-master"><span>▤ Casting Master</span><span class="count" id="c-castmas">0</span></button>
+      <button class="nav-btn" data-view="type-master"><span>▤ Type Master</span><span class="count" id="c-types">0</span></button>
+      <div class="nav-sep"></div>
+      <div class="nav-label">Data</div>
+      <button class="nav-btn" id="btn-export"><span>▤ Export JSON backup</span></button>
+      <button class="nav-btn" id="btn-import"><span>▤ Import JSON backup</span></button>
+      <button class="nav-btn" id="btn-seed"><span>▤ Load demo data</span></button>
+      <button class="nav-btn" id="btn-wipe"><span>▤ Clear all data</span></button>
+    </div>
+    <div class="sidebar-foot">
+      <div id="storage-mode">◆ Firebase Firestore</div>
+      <label style="display:block;margin-top:.6rem;font-size:.6rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.4)">Your name</label>
+      <input type="text" id="operator" placeholder="e.g. Akash" maxlength="40"
+        style="width:100%;margin-top:.3rem;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);color:#fff;padding:.35rem .5rem;font-size:.8rem;border-radius:.25rem">
+      <small style="display:block;margin-top:.35rem;font-size:.6rem;line-height:1.4;color:rgba(255,255,255,.35)">Stamped on every record you save.</small>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="main">
+    <header class="topbar">
+      <button class="btn icon hamburger" id="toggle-sidebar">☰</button>
+      <div class="title"><b id="top-title">Dashboard</b><span id="top-desc"></span></div>
+      <div class="search-wrap" id="search-wrap" style="display:none">
+        <input type="text" id="search" placeholder="Search…">
+      </div>
+      <button class="btn icon" id="btn-refresh" title="Refresh">⟳</button>
+    </header>
+
+    <div class="content">
+      <section class="page-head">
+        <div>
+          <p class="eyebrow" id="pg-eyebrow"></p>
+          <h1 id="pg-title"></h1>
+          <p class="desc" id="pg-desc"></p>
+        </div>
+        <span class="badge ok" id="pg-status">● Live data</span>
+      </section>
+      <div id="view"></div>
+      <footer style="margin-top:2rem;border-top:1px solid #cfd8dc;padding:1.25rem 0;display:flex;flex-wrap:wrap;gap:.5rem;justify-content:space-between;font-size:.75rem;color:var(--muted)">
+        <span>JAYCO Engineering India · Casting &amp; Pattern Control</span>
+        <span id="foot-mode">Test build · Local storage</span>
+      </footer>
+    </div>
+  </div>
+</div>
+
+<!-- MODALS -->
+<div class="modal-back" id="modal-back"><div class="modal" id="modal"></div></div>
+<div id="toasts"></div>
+<input type="file" id="file-import" accept="application/json" style="display:none">
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
+import { getFirestore, collection as fsCollection, getDocs, addDoc, updateDoc, deleteDoc, doc as fsDoc }
+  from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
+import { getAuth, signInAnonymously, onAuthStateChanged }
+  from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
+
+/* ==========================================================================
+   0. FIREBASE CONFIG  <<<<<<  PASTE YOURS HERE  >>>>>>
+   Firebase Console -> Project settings -> Your apps -> Web app -> Config
+   These values are NOT secret. Your Firestore Rules are what protect the data.
+   ========================================================================== */
+const firebaseConfig = {
+  apiKey:            "AIzaSyAs7J_8awM76M6H6-4fuwYJ9BrpwS5iYPU",
+  authDomain:        "jayco-dispatch-board.firebaseapp.com",
+  projectId:         "jayco-dispatch-board",
+  storageBucket:     "jayco-dispatch-board.firebasestorage.app",
+  messagingSenderId: "3086329458",
+  appId:             "1:3086329458:web:7862b6eab33fccae9844eb"
+};
+
+/* ==========================================================================
+   1. STORAGE ADAPTER  —  the ONLY part that changes when you move to Firebase
+   ==========================================================================
+   Every collection maps 1:1 to a Firestore collection of the same name.
+   To go live: implement the same four methods against Firestore and set
+   ACTIVE_ADAPTER = FirebaseAdapter. Nothing else in this file changes.
+   ------------------------------------------------------------------------ */
+
+const COLLECTIONS = [
+  'casting_challans',       // header + embedded items + embedded purchaseOrders
+  'pattern_masters',
+  'casting_masters',
+  'casting_types',
+  'control_records'         // pattern movement (module: "patterns")
+];
+
+/* Firestore collection names. Prefixed so this app can share ONE Firebase
+   project with your other JAYCO tools without any name collision.        */
+const FS_NAME = {
+  casting_challans: 'casting_challans',
+  pattern_masters:  'casting_pattern_masters',
+  casting_masters:  'casting_item_masters',
+  casting_types:    'casting_types',
+  control_records:  'casting_pattern_movements'
+};
+
+let app, db, auth;
+let currentUser = null;
+
+/* No passwords. Each person types their name once so every record is stamped
+   with who entered it. Stored on their own device only.                     */
+function operatorName(){
+  try { return localStorage.getItem('jayco_operator') || ''; } catch { return ''; }
+}
+function setOperatorName(v){
+  try { localStorage.setItem('jayco_operator', v); } catch {}
+}
+const authUser = () => operatorName().trim() || 'Unnamed user';
+
+const FirebaseAdapter = {
+  name: 'Firebase Firestore',
+  async list(c) {
+    const snap = await getDocs(fsCollection(db, FS_NAME[c]));
+    return snap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
+  },
+  async create(c, docData) {
+    const now = new Date().toISOString();
+    const body = { ...docData, createdAt: now, updatedAt: now, changedBy: authUser() };
+    delete body.id;
+    const ref = await addDoc(fsCollection(db, FS_NAME[c]), body);
+    return { ...body, id: ref.id };
+  },
+  async update(c, id, patch) {
+    const now = new Date().toISOString();
+    const body = { ...patch, updatedAt: now, changedBy: authUser() };
+    delete body.id;
+    await updateDoc(fsDoc(db, FS_NAME[c], id), body);
+    return { ...body, id };
+  },
+  async remove(c, id) {
+    await deleteDoc(fsDoc(db, FS_NAME[c], id));
+  }
+};
+
+/* Kept only so the JSON backup/restore buttons still work offline. */
+const LocalAdapter = {
+  name: 'Local test storage',
+  async list(c) { try { return JSON.parse(localStorage.getItem('jayco_' + c) || '[]'); } catch { return []; } },
+  async create(c, d) {
+    const rows = await this.list(c);
+    d.id = d.id || uid(); d.createdAt = new Date().toISOString(); d.updatedAt = d.createdAt;
+    rows.unshift(d); localStorage.setItem('jayco_' + c, JSON.stringify(rows)); return d;
+  },
+  async update(c, id, patch) {
+    const rows = await this.list(c);
+    const i = rows.findIndex(r => String(r.id) === String(id));
+    if (i < 0) throw new Error('Record not found.');
+    rows[i] = { ...rows[i], ...patch, id: rows[i].id, updatedAt: new Date().toISOString() };
+    localStorage.setItem('jayco_' + c, JSON.stringify(rows)); return rows[i];
+  },
+  async remove(c, id) {
+    const rows = (await this.list(c)).filter(r => String(r.id) !== String(id));
+    localStorage.setItem('jayco_' + c, JSON.stringify(rows));
+  }
+};
+
+const DB = FirebaseAdapter;
+
+/* ==========================================================================
+   2. STATE + HELPERS
+   ========================================================================== */
+
+const state = {
+  view: 'dashboard',
+  search: '',
+  challans: [], patternMasters: [], castingMasters: [], castingTypes: [], patternRecords: [],
+  entryForm: null, editingChallanId: null,
+  saving: false
+};
+
+const MATERIALS = ['Cast Iron','SG Iron','Cast Steel','Aluminium'];
+const PATTERN_TYPES = ['Split pattern','Match plate','Loose pattern','Core box'];
+const PATTERN_STATUS = ['Available','At foundry','Repair due','Retired'];
+const MOVE_STATUS = ['Available','Good','Recall','Repair due','On hold'];
+const MASTER_STATUS = ['Active','On hold','Inactive'];
+
+const VIEWS = {
+  'dashboard':          {eyebrow:'Operations overview', title:'Dashboard', desc:'Casting receipts, pattern position and master-data readiness.'},
+  'casting-records':    {eyebrow:'Closed challans', title:'Casting Management', desc:'Review closed foundry challans, items and weight differences.'},
+  'pattern-management': {eyebrow:'Pattern movement', title:'Pattern Management', desc:'Track every pattern set at JAYCO or with a foundry.'},
+  'insert-casting':     {eyebrow:'Goods receipt entry', title:'Insert Casting Details', desc:'Enter one foundry challan with one or more casting items.'},
+  'pattern-master':     {eyebrow:'Master data', title:'Pattern Master', desc:'Maintain the approved list of JAYCO patterns.'},
+  'casting-master':     {eyebrow:'Master data', title:'Casting Master', desc:'Maintain casting item types, materials and linked patterns.'},
+  'type-master':        {eyebrow:'Master data', title:'Type Master', desc:'Create or edit the casting types used throughout the system.'}
+};
+
+function uid(){ return 'id-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,8); }
+function today(){ return new Date().toISOString().slice(0,10); }
+function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function num(v){ const n = Number(v); return Number.isFinite(n) ? n : 0; }
+function fmtDate(v){
+  if(!v) return '—';
+  const d = new Date(v + 'T00:00:00');
+  if(isNaN(d)) return v;
+  return new Intl.DateTimeFormat('en-IN',{day:'2-digit',month:'short',year:'numeric'}).format(d);
+}
+function fmtWt(v){ return new Intl.NumberFormat('en-IN',{maximumFractionDigits:3}).format(num(v)) + ' kg'; }
+function badgeClass(s){
+  const v = String(s).toLowerCase();
+  if(['active','available','good','accepted','closed'].some(w=>v.includes(w))) return 'ok';
+  if(['repair','hold','foundry','pending'].some(w=>v.includes(w))) return 'warn';
+  if(['retired','recall','overdue','inactive'].some(w=>v.includes(w))) return 'bad';
+  return 'neutral';
+}
+function statusBadge(s){ return `<span class="badge ${badgeClass(s)}">${esc(s)}</span>`; }
+function toast(msg, kind='info'){
+  const el = document.createElement('div');
+  el.className = 'toast ' + kind;
+  el.textContent = msg;
+  document.getElementById('toasts').appendChild(el);
+  setTimeout(()=>{ el.style.opacity='0'; el.style.transition='opacity .3s'; setTimeout(()=>el.remove(),300); }, 3200);
+}
+function getPOs(ch){
+  if(ch.purchaseOrders && ch.purchaseOrders.length) return ch.purchaseOrders;
+  return ch.purchaseOrderNumber ? [{purchaseOrderNumber:ch.purchaseOrderNumber, purchaseOrderDate:ch.purchaseOrderDate}] : [];
+}
+function foundryComplete(ch){ return ch.items.length > 0 && ch.items.every(i => num(i.foundryTotalWeight) > 0); }
+function opt(list, sel){ return list.map(v=>`<option value="${esc(v)}" ${v===sel?'selected':''}>${esc(v)}</option>`).join(''); }
+
+/* ==========================================================================
+   3. DATA LOAD
+   ========================================================================== */
+
+async function loadAll(notify){
+  try{
+    const [ch, pm, cm, ct, cr] = await Promise.all(COLLECTIONS.map(c => DB.list(c)));
+    state.challans = ch.map(c => ({...c, items: c.items||[], purchaseOrders: c.purchaseOrders||[]}));
+    state.patternMasters = pm;
+    state.castingMasters = cm;
+    state.castingTypes = ct;
+    state.patternRecords = cr.filter(r => r.module === 'patterns');
+    document.getElementById('pg-status').className = 'badge ok';
+    document.getElementById('pg-status').textContent = '● Live data';
+    if(notify) toast('Dashboard refreshed','success');
+  }catch(e){
+    document.getElementById('pg-status').className = 'badge bad';
+    document.getElementById('pg-status').textContent = '● Storage unavailable';
+    toast('Could not load data: ' + e.message,'error');
+  }
+  render();
+}
+
+/* ==========================================================================
+   4. RENDER
+   ========================================================================== */
+
+function render(){
+  const v = VIEWS[state.view];
+  document.getElementById('top-title').textContent = v.title;
+  document.getElementById('top-desc').textContent = v.desc;
+  document.getElementById('pg-eyebrow').textContent = v.eyebrow;
+  document.getElementById('pg-title').textContent = v.title;
+  document.getElementById('pg-desc').textContent = v.desc;
+  document.getElementById('search-wrap').style.display = ['dashboard','insert-casting'].includes(state.view) ? 'none' : '';
+  document.getElementById('search').placeholder = 'Search ' + v.title.toLowerCase() + '…';
+
+  document.querySelectorAll('.nav-btn[data-view]').forEach(b =>
+    b.classList.toggle('active', b.dataset.view === state.view));
+  document.getElementById('c-challans').textContent = state.challans.length;
+  document.getElementById('c-patrec').textContent  = state.patternRecords.length;
+  document.getElementById('c-patmas').textContent  = state.patternMasters.length;
+  document.getElementById('c-castmas').textContent = state.castingMasters.length;
+  document.getElementById('c-types').textContent   = state.castingTypes.length;
+  document.getElementById('storage-mode').textContent = '◆ ' + DB.name;
+  document.getElementById('foot-mode').textContent = 'Test build · ' + DB.name;
+
+  const host = document.getElementById('view');
+  host.innerHTML = ({
+    'dashboard': viewDashboard,
+    'casting-records': viewCastingRecords,
+    'pattern-management': viewPatternManagement,
+    'insert-casting': viewInsertCasting,
+    'pattern-master': viewPatternMaster,
+    'casting-master': viewCastingMaster,
+    'type-master': viewTypeMaster
+  })[state.view]();
+}
+
+const q = () => state.search.trim().toLowerCase();
+const match = (...parts) => parts.join(' ').toLowerCase().includes(q());
+function emptyRow(cols, msg){ return `<tr class="empty-row"><td colspan="${cols}">${esc(msg)}</td></tr>`; }
+
+/* ---- Dashboard ---- */
+function viewDashboard(){
+  const totalQty = state.challans.reduce((s,c)=>s+num(c.totalQuantity),0);
+  const totalFW  = state.challans.reduce((s,c)=>s+num(c.foundryTotalWeight),0);
+  const totalAW  = state.challans.reduce((s,c)=>s+num(c.actualTotalWeight),0);
+  const recent = state.challans.slice(0,6);
+  return `
+  <div class="metrics">
+    <div class="metric-card dark"><p class="lbl">Closed challans</p><p class="val">${state.challans.length}</p><p class="note">${totalQty} total pieces</p></div>
+    <div class="metric-card red"><p class="lbl">Total quantity</p><p class="val">${totalQty}</p><p class="note">Across closed challans</p></div>
+    <div class="metric-card"><p class="lbl">Foundry weight</p><p class="val">${fmtWt(totalFW)}</p><p class="note">Declared total weight</p></div>
+    <div class="metric-card"><p class="lbl">JAYCO weight</p><p class="val">${fmtWt(totalAW)}</p><p class="note">Verified total weight</p></div>
+  </div>
+  <div class="two-col">
+    <div class="data-panel">
+      <div class="panel-heading">
+        <div><p class="eyebrow">Latest inward</p><h2 class="panel-title">Recent casting challans</h2></div>
+        <button class="btn" data-go="casting-records">View all</button>
+      </div>
+      <div class="table-scroll"><table>
+        <thead><tr><th>Challan No.</th><th>Date</th><th>Foundry</th><th class="num">Items</th><th class="num">JAYCO Weight</th></tr></thead>
+        <tbody>${ recent.map(c=>`<tr>
+          <td class="mono">${esc(c.challanNumber)}</td><td>${fmtDate(c.challanDate)}</td>
+          <td>${esc(c.foundryName)}</td><td class="num">${c.items.length}</td>
+          <td class="num">${fmtWt(c.actualTotalWeight)}</td></tr>`).join('')
+          || emptyRow(5,'No closed casting challans yet.') }</tbody>
+      </table></div>
+    </div>
+    <div class="data-panel" style="padding:1.25rem">
+      <p class="eyebrow">System readiness</p>
+      <h2 class="panel-title" style="margin-bottom:1.25rem">Master completion</h2>
+      <div style="margin-bottom:1.1rem">
+        <div style="display:flex;justify-content:space-between;font-size:.78rem"><b>Pattern master</b><span class="mono">${state.patternMasters.length}</span></div>
+        <div class="progress"><i style="width:${Math.min(100,state.patternMasters.length*10)}%"></i></div>
+      </div>
+      <div style="margin-bottom:1.4rem">
+        <div style="display:flex;justify-content:space-between;font-size:.78rem"><b>Casting master</b><span class="mono">${state.castingMasters.length}</span></div>
+        <div class="progress dark"><i style="width:${Math.min(100,state.castingMasters.length*10)}%"></i></div>
+      </div>
+      <div style="display:grid;gap:.5rem">
+        <button class="btn primary" data-new-challan style="justify-content:flex-start">＋ Insert casting details</button>
+        <button class="btn" data-open-pattern="" style="justify-content:flex-start">＋ Add pattern master</button>
+        <button class="btn" data-open-casting="" style="justify-content:flex-start">＋ Add casting master</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ---- Casting Management ---- */
+function viewCastingRecords(){
+  const rows = state.challans.filter(c => match(c.challanNumber, c.foundryName,
+    getPOs(c).map(p=>p.purchaseOrderNumber).join(' '),
+    c.items.map(i=>i.itemName+' '+i.material).join(' ')));
+  return `<section class="data-panel">
+    <div class="panel-heading">
+      <div><p class="eyebrow">Closed challan register</p><h2 class="panel-title">Casting Management</h2></div>
+      <button class="btn primary" data-new-challan>＋ New challan</button>
+    </div>
+    <div class="table-scroll"><table>
+      <thead><tr><th>Challan No.</th><th>Date</th><th>Foundry name</th><th>JAYCO P/O No.</th><th>P/O Date</th>
+      <th class="num">Items</th><th class="num">Qty</th><th class="num">Foundry Weight</th><th class="num">JAYCO Weight</th><th class="num">Difference</th><th class="num">Actions</th></tr></thead>
+      <tbody>${ rows.map(c=>{
+        const fc = foundryComplete(c), pos = getPOs(c);
+        const diff = num(c.actualTotalWeight) - num(c.foundryTotalWeight);
+        return `<tr>
+          <td class="mono">${esc(c.challanNumber)}</td>
+          <td>${fmtDate(c.challanDate)}</td>
+          <td>${esc(c.foundryName)}</td>
+          <td>${pos.map(p=>`<div class="mono">${esc(p.purchaseOrderNumber)}</div>`).join('')||'—'}</td>
+          <td>${pos.map(p=>`<div>${fmtDate(p.purchaseOrderDate)}</div>`).join('')||'—'}</td>
+          <td class="num">${c.items.length}</td>
+          <td class="num">${num(c.totalQuantity)}</td>
+          <td class="num">${fc?fmtWt(c.foundryTotalWeight):'Not entered'}</td>
+          <td class="num"><b>${fmtWt(c.actualTotalWeight)}</b></td>
+          <td class="num" style="color:${fc?(diff>0?'#b91c1c':'#047857'):'#94a3b8'}">${fc?fmtWt(diff):'—'}</td>
+          <td class="num" style="white-space:nowrap">
+            <button class="btn icon" data-view-challan="${esc(c.id)}" title="View">👁</button>
+            <button class="btn icon" data-edit-challan="${esc(c.id)}" title="Edit">✎</button>
+            <button class="btn icon danger" data-del-challan="${esc(c.id)}" title="Delete">🗑</button>
+          </td></tr>`; }).join('')
+        || emptyRow(11, state.challans.length ? 'No closed challans match the search.' : 'No closed challans yet. Select New challan to begin.') }
+      </tbody></table></div></section>`;
+}
+
+/* ---- Pattern Management ---- */
+function viewPatternManagement(){
+  const rows = state.patternRecords.filter(r => match(r.reference, r.item, r.foundry, r.notes));
+  return `<section class="data-panel">
+    <div class="panel-heading">
+      <div><p class="eyebrow">Stock and location</p><h2 class="panel-title">Pattern movement register</h2></div>
+      <button class="btn primary" data-open-move="">＋ Add pattern position</button>
+    </div>
+    <div class="table-scroll"><table>
+      <thead><tr><th>Pattern reference</th><th>Pattern / item</th><th>Current location</th><th class="num">Total sets</th>
+      <th class="num">In-house</th><th>Record date</th><th>Status</th><th class="num">Change</th></tr></thead>
+      <tbody>${ rows.map(r=>`<tr>
+        <td class="mono">${esc(r.reference)}</td><td><b>${esc(r.item)}</b></td><td>${esc(r.foundry)}</td>
+        <td class="num">${num(r.quantity)}</td><td class="num">${num(r.received)}</td>
+        <td>${fmtDate(r.dueDate)}</td><td>${statusBadge(r.status)}</td>
+        <td class="num" style="white-space:nowrap">
+          <button class="btn icon" data-open-move="${esc(r.id)}" title="Edit">✎</button>
+          <button class="btn icon danger" data-del-move="${esc(r.id)}" title="Delete">🗑</button>
+        </td></tr>`).join('')
+        || emptyRow(8, state.patternRecords.length ? 'No pattern records match the search.' : 'No pattern movement records yet.') }
+      </tbody></table></div></section>`;
+}
+
+/* ---- Pattern Master ---- */
+function viewPatternMaster(){
+  const rows = state.patternMasters.filter(r => match(r.patternCode, r.patternName, r.castingItem, r.location));
+  return `<section class="data-panel">
+    <div class="panel-heading">
+      <div><p class="eyebrow">Approved pattern list</p><h2 class="panel-title">Pattern Master</h2></div>
+      <button class="btn primary" data-open-pattern="">＋ Add pattern</button>
+    </div>
+    <div class="table-scroll"><table>
+      <thead><tr><th>Pattern code</th><th>Pattern name</th><th>Casting item</th><th>Type</th><th class="num">Sets</th><th>Location</th><th>Status</th><th class="num">Change</th></tr></thead>
+      <tbody>${ rows.map(r=>`<tr>
+        <td class="mono">${esc(r.patternCode)}</td><td><b>${esc(r.patternName)}</b></td>
+        <td>${esc(r.castingItem)||'—'}</td><td>${esc(r.patternType)}</td>
+        <td class="num">${num(r.totalQuantity)}</td><td>${esc(r.location)}</td><td>${statusBadge(r.status)}</td>
+        <td class="num" style="white-space:nowrap">
+          <button class="btn icon" data-open-pattern="${esc(r.id)}" title="Edit">✎</button>
+          <button class="btn icon danger" data-del-pattern="${esc(r.id)}" title="Delete">🗑</button>
+        </td></tr>`).join('')
+        || emptyRow(8, state.patternMasters.length ? 'No patterns match the search.' : 'Pattern Master is blank. Select Add pattern to begin.') }
+      </tbody></table></div></section>`;
+}
+
+/* ---- Casting Master ---- */
+function viewCastingMaster(){
+  const rows = state.castingMasters.filter(r => match(r.itemName, r.itemType, r.material, r.drawingNumber, r.patternCode));
+  return `<section class="data-panel">
+    <div class="panel-heading">
+      <div><p class="eyebrow">Approved casting list</p><h2 class="panel-title">Casting Master</h2></div>
+      <button class="btn primary" data-open-casting="">＋ Add casting item</button>
+    </div>
+    <div class="table-scroll"><table>
+      <thead><tr><th>Type</th><th>Casting item name</th><th>Material</th><th>Drawing No.</th><th>Pattern code</th><th>Status</th><th class="num">Change</th></tr></thead>
+      <tbody>${ rows.map(r=>`<tr>
+        <td><b>${esc(r.itemType)}</b></td><td><b>${esc(r.itemName)}</b></td><td>${esc(r.material)}</td>
+        <td>${esc(r.drawingNumber)||'—'}</td><td class="mono">${esc(r.patternCode)||'—'}</td><td>${statusBadge(r.status)}</td>
+        <td class="num" style="white-space:nowrap">
+          <button class="btn icon" data-open-casting="${esc(r.id)}" title="Edit">✎</button>
+          <button class="btn icon danger" data-del-casting="${esc(r.id)}" title="Delete">🗑</button>
+        </td></tr>`).join('')
+        || emptyRow(7, state.castingMasters.length ? 'No casting items match the search.' : 'Casting Master is blank. Select Add casting item to begin.') }
+      </tbody></table></div></section>`;
+}
+
+/* ---- Type Master ---- */
+function viewTypeMaster(){
+  const rows = state.castingTypes.filter(r => match(r.typeName, r.status, r.notes));
+  return `<section class="data-panel">
+    <div class="panel-heading">
+      <div><p class="eyebrow">Casting classification</p><h2 class="panel-title">Type Master</h2></div>
+      <button class="btn primary" data-open-type="">＋ Add type</button>
+    </div>
+    <div class="table-scroll"><table>
+      <thead><tr><th>Type Name</th><th>Status</th><th>Notes</th><th class="num">Change</th></tr></thead>
+      <tbody>${ rows.map(r=>`<tr>
+        <td><b>${esc(r.typeName)}</b></td><td>${statusBadge(r.status)}</td><td style="color:#5b6a72">${esc(r.notes)||'—'}</td>
+        <td class="num" style="white-space:nowrap">
+          <button class="btn icon" data-open-type="${esc(r.id)}" title="Edit">✎</button>
+          <button class="btn icon danger" data-del-type="${esc(r.id)}" title="Delete">🗑</button>
+        </td></tr>`).join('')
+        || emptyRow(4, state.castingTypes.length ? 'No casting types match the search.' : 'Type Master is blank. Select Add type to begin.') }
+      </tbody></table></div></section>`;
+}
+
+/* ---- Insert Casting Details ---- */
+function blankLine(){ return {masterCode:'', itemName:'', itemType:'Cap', material:'Cast Iron', quantity:'', foundryWeight:'', actualWeight:''}; }
+function blankPO(){ return {purchaseOrderNumber:'', purchaseOrderDate: today()}; }
+function blankEntry(){ return {challanNumber:'', challanDate: today(), foundryName:'', purchaseOrders:[blankPO()], items:[blankLine()]}; }
+
+function viewInsertCasting(){
+  if(!state.entryForm) state.entryForm = blankEntry();
+  const f = state.entryForm;
+  const editing = !!state.editingChallanId;
+  const typeOptions = state.castingTypes.filter(t=>t.status==='Active').map(t=>t.typeName);
+  const masters = [...state.castingMasters].sort((a,b)=>String(a.itemName).localeCompare(String(b.itemName),'en',{numeric:true}));
+  const foundries = [...new Set(state.challans.map(c=>c.foundryName))];
+
+  const totals = f.items.reduce((t,i)=>({
+    quantity:t.quantity+num(i.quantity), foundry:t.foundry+num(i.foundryWeight), actual:t.actual+num(i.actualWeight)
+  }), {quantity:0,foundry:0,actual:0});
+  const fwComplete = f.items.every(i => num(i.foundryWeight) > 0);
+  const diff = totals.actual - totals.foundry;
+
+  return `<section class="data-panel">
+    <div class="panel-heading">
+      <div><p class="eyebrow">${editing?'Change closed challan':'New foundry challan'}</p>
+      <h2 class="panel-title">${editing?'Edit Casting Challan':'Casting Challan Details'}</h2></div>
+      <span class="badge neutral">Multi-item entry</span>
+    </div>
+    <form id="entry-form">
+      <div class="form-grid">
+        <label class="field">Challan No. *<input type="text" required maxlength="80" name="challanNumber" value="${esc(f.challanNumber)}" placeholder="e.g. BSF/CH/1024"></label>
+        <label class="field">Date *<input type="date" required name="challanDate" value="${esc(f.challanDate)}"></label>
+        <label class="field">Foundry Name *<input type="text" required maxlength="160" name="foundryName" list="dl-foundries" value="${esc(f.foundryName)}" placeholder="Enter foundry name">
+          <datalist id="dl-foundries">${foundries.map(x=>`<option value="${esc(x)}">`).join('')}</datalist></label>
+
+        <div class="po-block">
+          <div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:.75rem;margin-bottom:.8rem">
+            <div><p class="field" style="margin:0">JAYCO Purchase Orders *</p>
+            <p style="margin:.25rem 0 0;font-size:.75rem;color:var(--muted)">Add up to 6 P/O numbers with their respective dates.</p></div>
+            <button type="button" class="btn" id="add-po" ${f.purchaseOrders.length>=6?'disabled':''}>＋ Add P/O</button>
+          </div>
+          ${ f.purchaseOrders.map((p,i)=>`<div class="po-row">
+              <label class="field">JAYCO P/O Number ${i+1} *<input type="text" required maxlength="100" data-po="${i}" data-pofield="purchaseOrderNumber" value="${esc(p.purchaseOrderNumber)}" placeholder="Enter JAYCO purchase order number"></label>
+              <label class="field">P/O Date *<input type="date" required data-po="${i}" data-pofield="purchaseOrderDate" value="${esc(p.purchaseOrderDate)}"></label>
+              <button type="button" class="btn icon danger" data-rm-po="${i}" ${f.purchaseOrders.length===1?'disabled':''}>🗑</button>
+            </div>`).join('') }
+        </div>
+      </div>
+
+      <div style="padding:1.25rem">
+        <div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:.75rem;margin-bottom:1rem">
+          <div><p class="eyebrow">Casting line items</p>
+          <p style="margin:.35rem 0 0;font-size:.82rem;color:var(--muted)">Enter total Foundry Weight if available and total JAYCO Weight; Average Weight/Pc = JAYCO Weight ÷ Qty.</p></div>
+          <button type="button" class="btn" id="add-item">＋ Add Item</button>
+        </div>
+        <div class="item-table-wrap"><table class="item-table">
+          <thead><tr><th style="min-width:230px">Item</th><th style="min-width:130px">Type</th><th style="min-width:130px">Material</th>
+          <th class="num" style="min-width:80px">Qty</th><th class="num" style="min-width:150px">Foundry Weight (Optional)</th>
+          <th class="num" style="min-width:140px">JAYCO Weight</th><th class="num" style="min-width:140px">Average Weight/Pc</th><th></th></tr></thead>
+          <tbody>${ f.items.map((it,i)=>{
+            const qty = num(it.quantity);
+            const avg = qty>0 ? num(it.actualWeight)/qty : 0;
+            const known = masters.some(m=>m.itemCode===it.masterCode);
+            return `<tr>
+              <td><div style="display:flex;gap:.4rem">
+                <select data-item="${i}" data-field="masterCode" required style="flex:1">
+                  <option value="">${masters.length?'Select saved item':'Save your first item'}</option>
+                  ${!known && it.itemName ? `<option value="${esc(it.masterCode)}" selected>${esc(it.itemName)}</option>` : ''}
+                  ${masters.map(m=>`<option value="${esc(m.itemCode)}" ${m.itemCode===it.masterCode?'selected':''}>${esc(m.itemName)}</option>`).join('')}
+                </select>
+                <button type="button" class="btn icon" data-quick-add="${i}" title="Save new item to Casting Master">＋</button>
+              </div></td>
+              <td><select data-item="${i}" data-field="itemType">
+                ${!typeOptions.includes(it.itemType) && it.itemType ? `<option value="${esc(it.itemType)}" selected>${esc(it.itemType)}</option>` : ''}
+                ${opt(typeOptions, it.itemType)}</select></td>
+              <td><select data-item="${i}" data-field="material">${opt(MATERIALS, it.material)}</select></td>
+              <td><input type="number" min="1" required class="num" data-item="${i}" data-field="quantity" value="${esc(it.quantity)}" placeholder="0" style="text-align:right"></td>
+              <td><input type="number" min="0.001" step="0.001" data-item="${i}" data-field="foundryWeight" value="${esc(it.foundryWeight)}" placeholder="Optional total kg" style="text-align:right"></td>
+              <td><input type="number" min="0.001" step="0.001" required data-item="${i}" data-field="actualWeight" value="${esc(it.actualWeight)}" placeholder="Total kg" style="text-align:right"></td>
+              <td class="num"><b>${it.actualWeight && qty>0 ? fmtWt(avg) : '—'}</b></td>
+              <td><button type="button" class="btn icon danger" data-rm-item="${i}" ${f.items.length===1?'disabled':''}>🗑</button></td>
+            </tr>`; }).join('') }
+          </tbody></table></div>
+
+        <div class="totals-grid">
+          <div class="weight-total-card"><span>Total Quantity</span><strong>${totals.quantity}</strong></div>
+          <div class="weight-total-card"><span>Foundry Total Weight</span><strong>${fwComplete?fmtWt(totals.foundry):'—'}</strong></div>
+          <div class="weight-total-card actual"><span>JAYCO Total Weight</span><strong>${fmtWt(totals.actual)}</strong></div>
+          <div class="weight-total-card ${fwComplete && diff>0 ? 'diff-up':'diff-ok'}"><span>Weight Difference</span><strong>${fwComplete?fmtWt(diff):'—'}</strong></div>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button type="button" class="btn" data-go="casting-records">Cancel</button>
+        <button type="button" class="btn" id="form-pdf">⬇ PDF</button>
+        <button type="button" class="btn green" id="form-wa">✆ WhatsApp</button>
+        <button type="submit" class="btn primary">🔒 ${editing?'Update &amp; Close Challan':'Close Challan'}</button>
+      </div>
+    </form></section>`;
+}
+
+/* ==========================================================================
+   5. MODALS
+   ========================================================================== */
+function openModal(html, wide){
+  const m = document.getElementById('modal');
+  m.className = 'modal' + (wide ? ' wide' : '');
+  m.innerHTML = html;
+  document.getElementById('modal-back').classList.add('open');
+}
+function closeModal(){ document.getElementById('modal-back').classList.remove('open'); }
+
+function modalPattern(id){
+  const r = state.patternMasters.find(x=>String(x.id)===String(id)) || {};
+  const isEdit = !!r.id;
+  openModal(`<form id="f-pattern">
+    <div class="modal-head"><h3>${isEdit?'Edit':'Add'} Pattern Master</h3>
+    <p>Maintain the approved pattern identification, construction and home location.</p></div>
+    <div class="modal-body">
+      <label class="field">Pattern Code *<input type="text" required maxlength="80" name="patternCode" value="${esc(r.patternCode||'')}" placeholder="e.g. PTN-SNH-520"></label>
+      <label class="field">Total Sets *<input type="number" required min="0" name="totalQuantity" value="${esc(r.totalQuantity ?? 1)}"></label>
+      <label class="field full">Pattern Name *<input type="text" required maxlength="180" name="patternName" value="${esc(r.patternName||'')}" placeholder="e.g. SNH 520-617 housing pattern"></label>
+      <label class="field full">Casting Item<input type="text" maxlength="200" name="castingItem" list="dl-ci" value="${esc(r.castingItem||'')}" placeholder="Linked casting item">
+        <datalist id="dl-ci">${state.castingMasters.map(m=>`<option value="${esc(m.itemName)}">`).join('')}</datalist></label>
+      <label class="field">Pattern Type<select name="patternType">${opt(PATTERN_TYPES, r.patternType||'Split pattern')}</select></label>
+      <label class="field">Home Location<input type="text" maxlength="160" name="location" value="${esc(r.location||'In-house')}" placeholder="In-house rack or foundry"></label>
+      <label class="field">Status<select name="status">${opt(PATTERN_STATUS, r.status||'Available')}</select></label>
+      <label class="field full">Notes<textarea maxlength="500" name="notes">${esc(r.notes||'')}</textarea></label>
+    </div>
+    <div class="modal-foot"><button type="button" class="btn" data-close>Cancel</button>
+    <button type="submit" class="btn primary">Save pattern</button></div>
+    <input type="hidden" name="id" value="${esc(r.id||'')}"></form>`);
+}
+
+function modalCasting(id, quickIndex){
+  const r = state.castingMasters.find(x=>String(x.id)===String(id)) || {};
+  const isEdit = !!r.id;
+  const typeOptions = state.castingTypes.filter(t=>t.status==='Active').map(t=>t.typeName);
+  const cur = r.itemType || typeOptions[0] || 'Cap';
+  openModal(`<form id="f-casting">
+    <div class="modal-head"><h3>${isEdit?'Edit Casting Master': quickIndex!=null ? 'Save New Casting Item':'Add Casting Master'}</h3>
+    <p>${quickIndex!=null?'Save this item to Casting Master and select it on the current challan line.':'Maintain the approved casting type, material and related pattern.'}</p></div>
+    <div class="modal-body">
+      <label class="field">Type *<select name="itemType" required>${!typeOptions.includes(cur)&&cur?`<option value="${esc(cur)}" selected>${esc(cur)}</option>`:''}${opt(typeOptions,cur)}</select></label>
+      <label class="field">Material<select name="material">${opt(MATERIALS, r.material||'Cast Iron')}</select></label>
+      <label class="field full">Casting Item Name *<input type="text" required maxlength="180" name="itemName" value="${esc(r.itemName||'')}" placeholder="e.g. SNH 520-617 bearing housing"></label>
+      <label class="field">Drawing No.<input type="text" maxlength="100" name="drawingNumber" value="${esc(r.drawingNumber||'')}"></label>
+      <label class="field">Pattern Code<input type="text" maxlength="80" name="patternCode" list="dl-pc" value="${esc(r.patternCode||'')}">
+        <datalist id="dl-pc">${state.patternMasters.map(p=>`<option value="${esc(p.patternCode)}">`).join('')}</datalist></label>
+      <label class="field">Status<select name="status">${opt(MASTER_STATUS, r.status||'Active')}</select></label>
+      <label class="field full">Notes<textarea maxlength="500" name="notes">${esc(r.notes||'')}</textarea></label>
+    </div>
+    <div class="modal-foot"><button type="button" class="btn" data-close>Cancel</button>
+    <button type="submit" class="btn primary">${quickIndex!=null?'Save &amp; select item':'Save casting item'}</button></div>
+    <input type="hidden" name="id" value="${esc(r.id||'')}">
+    <input type="hidden" name="quickIndex" value="${quickIndex??''}"></form>`);
+}
+
+function modalType(id){
+  const r = state.castingTypes.find(x=>String(x.id)===String(id)) || {};
+  openModal(`<form id="f-type">
+    <div class="modal-head"><h3>${r.id?'Edit':'Add'} Casting Type</h3>
+    <p>This type will be available in Casting Master and every casting challan.</p></div>
+    <div class="modal-body single">
+      <label class="field">Type Name *<input type="text" required maxlength="80" name="typeName" value="${esc(r.typeName||'')}" placeholder="e.g. Nut, Crown Wheel or Plates"></label>
+      <label class="field" style="margin-top:1rem">Status<select name="status">${opt(['Active','Inactive'], r.status||'Active')}</select></label>
+      <label class="field" style="margin-top:1rem">Notes<textarea maxlength="500" name="notes" placeholder="Optional usage or description">${esc(r.notes||'')}</textarea></label>
+    </div>
+    <div class="modal-foot"><button type="button" class="btn" data-close>Cancel</button>
+    <button type="submit" class="btn primary">Save type</button></div>
+    <input type="hidden" name="id" value="${esc(r.id||'')}"></form>`);
+}
+
+function modalMovement(id){
+  const r = state.patternRecords.find(x=>String(x.id)===String(id)) || {};
+  openModal(`<form id="f-move">
+    <div class="modal-head"><h3>${r.id?'Edit':'Add'} Pattern Position</h3>
+    <p>Record the current physical location and availability of a pattern set.</p></div>
+    <div class="modal-body">
+      <label class="field">Pattern Reference *<input type="text" required maxlength="80" name="reference" list="dl-pr" value="${esc(r.reference||'')}" placeholder="Pattern code">
+        <datalist id="dl-pr">${state.patternMasters.map(p=>`<option value="${esc(p.patternCode)}">`).join('')}</datalist></label>
+      <label class="field">Record Date<input type="date" name="dueDate" value="${esc(r.dueDate||today())}"></label>
+      <label class="field full">Pattern / Item *<input type="text" required maxlength="180" name="item" value="${esc(r.item||'')}"></label>
+      <label class="field full">Current Foundry / Location *<input type="text" required maxlength="180" name="foundry" value="${esc(r.foundry||'In-house')}"></label>
+      <label class="field">Total Sets *<input type="number" required min="0" name="quantity" value="${esc(r.quantity ?? 1)}"></label>
+      <label class="field">In-house Sets<input type="number" min="0" name="received" value="${esc(r.received ?? 1)}"></label>
+      <label class="field">Status<select name="status">${opt(MOVE_STATUS, r.status||'Available')}</select></label>
+      <label class="field full">Notes<textarea maxlength="500" name="notes">${esc(r.notes||'')}</textarea></label>
+    </div>
+    <div class="modal-foot"><button type="button" class="btn" data-close>Cancel</button>
+    <button type="submit" class="btn primary">Save pattern position</button></div>
+    <input type="hidden" name="id" value="${esc(r.id||'')}"></form>`);
+}
+
+function modalViewChallan(id){
+  const c = state.challans.find(x=>String(x.id)===String(id));
+  if(!c) return;
+  const fc = foundryComplete(c), pos = getPOs(c);
+  openModal(`<div class="modal-head"><h3>Challan ${esc(c.challanNumber)}</h3>
+    <p>${fmtDate(c.challanDate)} · ${esc(c.foundryName)} · ${pos.length} P/O${pos.length===1?'':'s'} · ${c.items.length} item${c.items.length===1?'':'s'}</p></div>
+    <div style="padding:0 1.25rem">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:.6rem;margin-bottom:1rem">
+        ${pos.map((p,i)=>`<div style="border:1px solid var(--border);background:#f8fafc;padding:.7rem">
+          <p class="eyebrow" style="font-size:.6rem">JAYCO P/O ${i+1}</p>
+          <p class="mono" style="margin:.3rem 0 0;font-size:.85rem">${esc(p.purchaseOrderNumber)}</p>
+          <p style="margin:.25rem 0 0;font-size:.75rem;color:var(--muted)">P/O Date: ${fmtDate(p.purchaseOrderDate)}</p></div>`).join('')}
+      </div>
+      <div class="table-scroll" style="border:1px solid var(--border)"><table>
+        <thead><tr><th>Item</th><th>Type</th><th>Material</th><th class="num">Qty</th><th class="num">Foundry Weight</th><th class="num">JAYCO Weight</th><th class="num">Average Weight/Pc</th></tr></thead>
+        <tbody>${c.items.map(i=>`<tr><td><b>${esc(i.itemName)}</b></td><td>${esc(i.itemType)}</td><td>${esc(i.material)}</td>
+          <td class="num">${num(i.quantity)}</td><td class="num">${num(i.foundryTotalWeight)>0?fmtWt(i.foundryTotalWeight):'Not entered'}</td>
+          <td class="num"><b>${fmtWt(i.actualTotalWeight)}</b></td>
+          <td class="num">${num(i.quantity)>0?fmtWt(num(i.actualTotalWeight)/num(i.quantity)):'—'}</td></tr>`).join('')}</tbody>
+      </table></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:.75rem;margin-top:1rem">
+        <div class="weight-total-card"><span>Total Quantity</span><strong>${num(c.totalQuantity)}</strong></div>
+        <div class="weight-total-card"><span>Foundry Total Weight</span><strong>${fc?fmtWt(c.foundryTotalWeight):'Not entered'}</strong></div>
+        <div class="weight-total-card actual"><span>JAYCO Total Weight</span><strong>${fmtWt(c.actualTotalWeight)}</strong></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button type="button" class="btn" data-close>Close</button>
+      <button type="button" class="btn" data-pdf-challan="${esc(c.id)}">⬇ PDF</button>
+      <button type="button" class="btn green" data-wa-challan="${esc(c.id)}">✆ WhatsApp</button>
+      <button type="button" class="btn primary" data-edit-challan="${esc(c.id)}">✎ Edit challan</button>
+    </div>`, true);
+}
+
+/* ==========================================================================
+   6. PDF + WHATSAPP
+   ========================================================================== */
+function buildChallanPdf(c){
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({orientation:'landscape', unit:'pt', format:'a4'});
+  const W = doc.internal.pageSize.getWidth();
+  const RED = [201,35,45], DARK = [24,33,38], SLATE = [110,124,132];
+  const fc = foundryComplete(c), pos = getPOs(c);
+
+  // header band
+  doc.setFillColor(...DARK); doc.rect(0,0,W,54,'F');
+  doc.setFillColor(...RED); doc.rect(0,54,W,4,'F');
+  doc.setTextColor(255,255,255);
+  doc.setFont('helvetica','bold'); doc.setFontSize(20); doc.text('JAYCO', 30, 34);
+  doc.setFontSize(13); doc.text('JAYCO ENGINEERING INDIA', W-30, 28, {align:'right'});
+  doc.setFont('helvetica','normal'); doc.setFontSize(8);
+  doc.text('Ahmedabad-Indore Highway, Dist. Kheda, Gujarat  ·  www.jaycohousing.com', W-30, 42, {align:'right'});
+
+  // title
+  doc.setTextColor(...DARK); doc.setFont('helvetica','bold'); doc.setFontSize(13);
+  doc.text('CASTING INWARD CHALLAN', 30, 80);
+
+  // meta
+  doc.setFontSize(8); doc.setTextColor(...SLATE);
+  const meta = [['CHALLAN NO.', c.challanNumber], ['CHALLAN DATE', fmtDate(c.challanDate)], ['FOUNDRY NAME', c.foundryName]];
+  let mx = 30;
+  meta.forEach(([l,v])=>{
+    doc.setDrawColor(215,222,226); doc.rect(mx, 90, 250, 34);
+    doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor(...SLATE); doc.text(l, mx+8, 102);
+    doc.setFontSize(10); doc.setTextColor(...DARK); doc.text(String(v||'—').slice(0,42), mx+8, 116);
+    mx += 258;
+  });
+
+  // POs
+  let py = 132;
+  pos.forEach((p,i)=>{
+    const col = i % 3, row = Math.floor(i/3);
+    const x = 30 + col*258, y = py + row*34;
+    doc.setDrawColor(215,222,226); doc.rect(x, y, 250, 30);
+    doc.setFont('helvetica','bold'); doc.setFontSize(6.2); doc.setTextColor(...SLATE);
+    doc.text(`JAYCO P/O ${i+1}`, x+8, y+11);
+    doc.setFontSize(9); doc.setTextColor(...DARK);
+    doc.text(String(p.purchaseOrderNumber||'—').slice(0,26), x+8, y+23);
+    doc.setFontSize(7); doc.setTextColor(...SLATE);
+    doc.text(fmtDate(p.purchaseOrderDate), x+160, y+23);
+  });
+  const tableTop = py + Math.ceil(pos.length/3)*34 + 14;
+
+  doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(...RED);
+  doc.text('CALCULATION: AVERAGE WEIGHT/PC = JAYCO WEIGHT / QTY', 30, tableTop - 4);
+
+  doc.autoTable({
+    startY: tableTop,
+    margin: {left:30, right:30},
+    head: [['SR','CASTING ITEM','TYPE','MATERIAL','QTY','FOUNDRY WEIGHT','JAYCO WEIGHT','AVERAGE WEIGHT/PC']],
+    body: c.items.map((i,n)=>[
+      n+1, i.itemName, i.itemType, i.material, num(i.quantity),
+      num(i.foundryTotalWeight)>0 ? fmtWt(i.foundryTotalWeight) : 'Not entered',
+      fmtWt(i.actualTotalWeight),
+      num(i.quantity)>0 ? fmtWt(num(i.actualTotalWeight)/num(i.quantity)) : '—'
+    ]),
+    styles:{fontSize:8, cellPadding:5, lineColor:[215,222,226], lineWidth:.4},
+    headStyles:{fillColor:RED, textColor:255, fontStyle:'bold', fontSize:7.5, halign:'center'},
+    columnStyles:{0:{halign:'center',cellWidth:28},4:{halign:'right'},5:{halign:'right'},6:{halign:'right',fontStyle:'bold'},7:{halign:'right'}},
+    alternateRowStyles:{fillColor:[248,250,252]}
+  });
+
+  // totals
+  let ty = doc.lastAutoTable.finalY + 14;
+  const cards = [
+    ['TOTAL QUANTITY', String(num(c.totalQuantity)), null],
+    ['FOUNDRY TOTAL WEIGHT', fc?fmtWt(c.foundryTotalWeight):'Not entered', null],
+    ['JAYCO TOTAL WEIGHT', fmtWt(c.actualTotalWeight), DARK],
+    ['DIFFERENCE', fc?fmtWt(num(c.actualTotalWeight)-num(c.foundryTotalWeight)):'Not available', RED]
+  ];
+  const cw = (W - 60 - 3*10) / 4;
+  cards.forEach(([l,v,fill],i)=>{
+    const x = 30 + i*(cw+10);
+    if(fill){ doc.setFillColor(...fill); doc.rect(x,ty,cw,42,'F'); doc.setTextColor(255,255,255); }
+    else { doc.setDrawColor(215,222,226); doc.setFillColor(248,250,252); doc.rect(x,ty,cw,42,'FD'); doc.setTextColor(...SLATE); }
+    doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.text(l, x+8, ty+14);
+    doc.setFontSize(11); if(!fill) doc.setTextColor(...DARK);
+    doc.text(v, x+8, ty+31);
+  });
+
+  // signatures + footer
+  ty += 66;
+  doc.setDrawColor(180,190,196);
+  ['RECEIVED BY','CHECKED BY','AUTHORISED SIGNATORY'].forEach((l,i)=>{
+    const x = 30 + i*((W-60)/3);
+    doc.line(x, ty+26, x+((W-60)/3)-40, ty+26);
+    doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor(...SLATE);
+    doc.text(l, x, ty+38);
+  });
+  doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(...SLATE);
+  doc.text('Generated from JAYCO Casting & Pattern Control System', 30, doc.internal.pageSize.getHeight()-16);
+  return doc;
+}
+
+function downloadPdf(c){
+  try{
+    buildChallanPdf(c).save('JAYCO-Casting-Challan-' + String(c.challanNumber).replace(/[^a-z0-9-]+/gi,'-') + '.pdf');
+    toast('Branded casting challan PDF downloaded','success');
+  }catch(e){ toast('The PDF could not be created: ' + e.message,'error'); }
+}
+
+function shareWhatsApp(c){
+  const fc = foundryComplete(c), pos = getPOs(c);
+  const lines = [
+    '*JAYCO ENGINEERING INDIA*','*Casting Inward Challan*',
+    `Challan: ${c.challanNumber}`, `Date: ${fmtDate(c.challanDate)}`, `Foundry: ${c.foundryName}`,
+    ...pos.map((p,i)=>`JAYCO P/O ${i+1}: ${p.purchaseOrderNumber} | Date: ${fmtDate(p.purchaseOrderDate)}`),
+    '',
+    ...c.items.map((i,n)=>`${n+1}. ${i.itemName} - ${i.itemType} - ${i.material}\nQty: ${num(i.quantity)} | Foundry Weight: ${num(i.foundryTotalWeight)>0?fmtWt(i.foundryTotalWeight):'Not entered'} | JAYCO Weight: ${fmtWt(i.actualTotalWeight)} | Average/Pc: ${num(i.quantity)>0?fmtWt(num(i.actualTotalWeight)/num(i.quantity)):'-'}`),
+    '',
+    `Total Qty: ${num(c.totalQuantity)}`,
+    `Foundry Total Weight: ${fc?fmtWt(c.foundryTotalWeight):'Not entered'}`,
+    `JAYCO Total Weight: ${fmtWt(c.actualTotalWeight)}`,
+    `Difference: ${fc?fmtWt(num(c.actualTotalWeight)-num(c.foundryTotalWeight)):'Not available'}`
+  ];
+  window.open('https://wa.me/?text=' + encodeURIComponent(lines.join('\n')), '_blank', 'noopener');
+  toast('WhatsApp opened. Attach the downloaded PDF manually if required.','info');
+}
+
+/* Build a challan object from the current entry form (with validation) */
+function currentFormChallan(){
+  const f = state.entryForm;
+  const items = f.items.map(i=>{
+    const qty = num(i.quantity), fw = num(i.foundryWeight), aw = num(i.actualWeight);
+    return {itemName:i.itemName, itemType:i.itemType, material:i.material, quantity:qty,
+            foundryWeight:fw, actualWeight:aw, foundryTotalWeight:fw, actualTotalWeight:aw};
+  });
+  const bad = !f.challanNumber.trim() || !f.challanDate || !f.foundryName.trim()
+    || !f.purchaseOrders.length
+    || f.purchaseOrders.some(p=>!p.purchaseOrderNumber.trim() || !p.purchaseOrderDate)
+    || items.some(i=>!i.itemName || !i.itemType || !i.material || i.quantity<=0 || i.actualWeight<=0);
+  if(bad){ toast('Complete the challan, JAYCO P/O, item, quantity and JAYCO weight fields first. Foundry weight is optional.','error'); return null; }
+  return {
+    id: state.editingChallanId || 'draft',
+    challanNumber: f.challanNumber, challanDate: f.challanDate, foundryName: f.foundryName,
+    purchaseOrderNumber: f.purchaseOrders[0].purchaseOrderNumber,
+    purchaseOrderDate: f.purchaseOrders[0].purchaseOrderDate,
+    purchaseOrders: f.purchaseOrders, status: state.editingChallanId ? 'Closed' : 'Draft',
+    totalQuantity: items.reduce((s,i)=>s+i.quantity,0),
+    foundryTotalWeight: items.reduce((s,i)=>s+i.foundryTotalWeight,0),
+    actualTotalWeight: items.reduce((s,i)=>s+i.actualTotalWeight,0),
+    items
+  };
+}
+
+/* ==========================================================================
+   7. EVENTS
+   ========================================================================== */
+document.addEventListener('click', async (e) => {
+  const t = e.target.closest('[data-view],[data-go],[data-new-challan],[data-view-challan],[data-edit-challan],[data-del-challan],[data-open-pattern],[data-del-pattern],[data-open-casting],[data-del-casting],[data-open-type],[data-del-type],[data-open-move],[data-del-move],[data-close],[data-rm-po],[data-rm-item],[data-quick-add],[data-pdf-challan],[data-wa-challan]');
+  if(!t) return;
+  const d = t.dataset;
+
+  if(d.view !== undefined){ state.view = d.view; state.search=''; document.getElementById('search').value=''; document.getElementById('sidebar').classList.remove('open'); render(); return; }
+  if(d.go !== undefined){ state.view = d.go; render(); window.scrollTo(0,0); return; }
+  if(d.close !== undefined){ closeModal(); return; }
+
+  if(d.newChallan !== undefined){ state.editingChallanId=null; state.entryForm=blankEntry(); state.view='insert-casting'; render(); window.scrollTo(0,0); return; }
+
+  if(d.viewChallan){ modalViewChallan(d.viewChallan); return; }
+  if(d.pdfChallan){ const c = state.challans.find(x=>String(x.id)===d.pdfChallan); if(c) downloadPdf(c); return; }
+  if(d.waChallan){ const c = state.challans.find(x=>String(x.id)===d.waChallan); if(c) shareWhatsApp(c); return; }
+
+  if(d.editChallan){
+    const c = state.challans.find(x=>String(x.id)===d.editChallan); if(!c) return;
+    closeModal();
+    state.editingChallanId = c.id;
+    state.entryForm = {
+      challanNumber:c.challanNumber, challanDate:c.challanDate, foundryName:c.foundryName,
+      purchaseOrders:getPOs(c).map(p=>({...p})),
+      items:c.items.map((i,n)=>({
+        masterCode: (state.castingMasters.find(m=>m.itemName===i.itemName)||{}).itemCode || ('legacy-'+n),
+        itemName:i.itemName, itemType:i.itemType, material:i.material,
+        quantity:String(i.quantity), foundryWeight: num(i.foundryTotalWeight)>0?String(i.foundryTotalWeight):'',
+        actualWeight:String(i.actualTotalWeight)}))
+    };
+    state.view='insert-casting'; render(); window.scrollTo(0,0); return;
+  }
+
+  if(d.delChallan){ if(confirm('Delete this challan permanently?')){ await DB.remove('casting_challans', d.delChallan); toast('Challan deleted','success'); loadAll(); } return; }
+  if(d.delPattern){ if(confirm('Delete this pattern from the master?')){ await DB.remove('pattern_masters', d.delPattern); toast('Pattern deleted','success'); loadAll(); } return; }
+  if(d.delCasting){ if(confirm('Delete this casting item from the master?')){ await DB.remove('casting_masters', d.delCasting); toast('Casting item deleted','success'); loadAll(); } return; }
+  if(d.delType){ if(confirm('Delete this casting type?')){ await DB.remove('casting_types', d.delType); toast('Type deleted','success'); loadAll(); } return; }
+  if(d.delMove){ if(confirm('Delete this pattern position record?')){ await DB.remove('control_records', d.delMove); toast('Pattern position deleted','success'); loadAll(); } return; }
+
+  if(d.openPattern !== undefined){ modalPattern(d.openPattern); return; }
+  if(d.openCasting !== undefined){ modalCasting(d.openCasting, null); return; }
+  if(d.openType !== undefined){ modalType(d.openType); return; }
+  if(d.openMove !== undefined){ modalMovement(d.openMove); return; }
+  if(d.quickAdd !== undefined){ modalCasting('', Number(d.quickAdd)); return; }
+
+  if(d.rmPo !== undefined){
+    if(state.entryForm.purchaseOrders.length>1) state.entryForm.purchaseOrders.splice(Number(d.rmPo),1);
+    render(); return;
+  }
+  if(d.rmItem !== undefined){
+    if(state.entryForm.items.length>1) state.entryForm.items.splice(Number(d.rmItem),1);
+    render(); return;
+  }
+});
+
+/* modal backdrop click */
+document.getElementById('modal-back').addEventListener('click', e => { if(e.target.id==='modal-back') closeModal(); });
+
+/* topbar */
+document.getElementById('search').addEventListener('input', e => { state.search = e.target.value; render(); });
+document.getElementById('btn-refresh').addEventListener('click', () => loadAll(true));
+document.getElementById('toggle-sidebar').addEventListener('click', () => document.getElementById('sidebar').classList.toggle('open'));
+
+/* entry form live binding */
+document.addEventListener('input', e => {
+  const el = e.target;
+  if(!state.entryForm) return;
+  if(el.name && ['challanNumber','challanDate','foundryName'].includes(el.name) && el.closest('#entry-form')){
+    state.entryForm[el.name] = el.value; return;   // no re-render: keeps focus
+  }
+  if(el.dataset.po !== undefined){ state.entryForm.purchaseOrders[Number(el.dataset.po)][el.dataset.pofield] = el.value; return; }
+  if(el.dataset.item !== undefined){
+    const i = Number(el.dataset.item), field = el.dataset.field;
+    state.entryForm.items[i][field] = el.value;
+    // live-update the average cell without full re-render
+    const row = el.closest('tr');
+    const it = state.entryForm.items[i], qty = num(it.quantity);
+    if(row) row.querySelector('td.num b').textContent = (it.actualWeight && qty>0) ? fmtWt(num(it.actualWeight)/qty) : '—';
+    updateEntryTotals();
+  }
+});
+document.addEventListener('change', e => {
+  const el = e.target;
+  if(!state.entryForm) return;
+  if(el.dataset.item !== undefined && el.dataset.field === 'masterCode'){
+    const m = state.castingMasters.find(x=>x.itemCode===el.value);
+    const i = Number(el.dataset.item);
+    if(m) Object.assign(state.entryForm.items[i], {masterCode:m.itemCode, itemName:m.itemName, itemType:m.itemType, material:m.material});
+    render();
+  } else if(el.dataset.item !== undefined){
+    state.entryForm.items[Number(el.dataset.item)][el.dataset.field] = el.value;
+  }
+});
+
+function updateEntryTotals(){
+  const f = state.entryForm; if(!f) return;
+  const cards = document.querySelectorAll('.totals-grid .weight-total-card strong');
+  if(cards.length < 4) return;
+  const t = f.items.reduce((a,i)=>({q:a.q+num(i.quantity), fw:a.fw+num(i.foundryWeight), aw:a.aw+num(i.actualWeight)}),{q:0,fw:0,aw:0});
+  const complete = f.items.every(i=>num(i.foundryWeight)>0);
+  cards[0].textContent = t.q;
+  cards[1].textContent = complete ? fmtWt(t.fw) : '—';
+  cards[2].textContent = fmtWt(t.aw);
+  cards[3].textContent = complete ? fmtWt(t.aw - t.fw) : '—';
+  const diffCard = cards[3].parentElement;
+  diffCard.className = 'weight-total-card ' + (complete && (t.aw-t.fw)>0 ? 'diff-up' : 'diff-ok');
+}
+
+/* form buttons inside the entry view */
+document.addEventListener('click', e => {
+  if(e.target.closest('#add-po')){ state.entryForm.purchaseOrders.push(blankPO()); render(); }
+  if(e.target.closest('#add-item')){ state.entryForm.items.push(blankLine()); render(); }
+  if(e.target.closest('#form-pdf')){ const c = currentFormChallan(); if(c) downloadPdf(c); }
+  if(e.target.closest('#form-wa')){ const c = currentFormChallan(); if(c) shareWhatsApp(c); }
+});
+
+/* form submissions */
+document.addEventListener('submit', async e => {
+  e.preventDefault();
+  const f = e.target;
+  const data = Object.fromEntries(new FormData(f).entries());
+
+  try{
+    if(f.id === 'entry-form'){
+      const c = currentFormChallan(); if(!c) return;
+      const payload = {...c, status:'Closed'};
+      delete payload.id;
+      if(state.editingChallanId){
+        await DB.update('casting_challans', state.editingChallanId, payload);
+        toast('Closed challan updated','success');
+      } else {
+        const dup = state.challans.find(x => x.foundryName===payload.foundryName && x.challanNumber===payload.challanNumber);
+        if(dup) return toast('That challan number already exists for this foundry.','error');
+        await DB.create('casting_challans', payload);
+        toast('Challan closed and moved to Casting Management','success');
+      }
+      state.entryForm = blankEntry(); state.editingChallanId = null; state.view = 'casting-records';
+      await loadAll(); window.scrollTo(0,0); return;
+    }
+
+    if(f.id === 'f-pattern'){
+      const p = {patternCode:data.patternCode.trim(), patternName:data.patternName.trim(), castingItem:data.castingItem.trim(),
+                 patternType:data.patternType, totalQuantity:num(data.totalQuantity), location:data.location.trim(),
+                 status:data.status, notes:data.notes.trim()};
+      const dup = state.patternMasters.find(x=>x.patternCode===p.patternCode && String(x.id)!==String(data.id));
+      if(dup) return toast('That pattern code already exists.','error');
+      data.id ? await DB.update('pattern_masters', data.id, p) : await DB.create('pattern_masters', p);
+      toast(data.id?'Pattern master updated':'Pattern added to master','success');
+    }
+
+    if(f.id === 'f-casting'){
+      const c = {itemName:data.itemName.trim(), itemType:data.itemType, material:data.material,
+                 drawingNumber:data.drawingNumber.trim(), patternCode:data.patternCode.trim(),
+                 status:data.status, notes:data.notes.trim(), averageWeight:0};
+      let saved;
+      if(data.id){ saved = await DB.update('casting_masters', data.id, c); }
+      else { c.itemCode = 'CAST-' + Math.random().toString(36).slice(2,10).toUpperCase(); saved = await DB.create('casting_masters', c); }
+      if(data.quickIndex !== '' && state.entryForm){
+        const i = Number(data.quickIndex);
+        Object.assign(state.entryForm.items[i], {masterCode:saved.itemCode, itemName:saved.itemName, itemType:saved.itemType, material:saved.material});
+        toast('Item saved and selected on the challan','success');
+      } else toast(data.id?'Casting master updated':'Casting item added to master','success');
+    }
+
+    if(f.id === 'f-type'){
+      const t = {typeName:data.typeName.trim(), status:data.status, notes:data.notes.trim()};
+      const dup = state.castingTypes.find(x=>x.typeName.toLowerCase()===t.typeName.toLowerCase() && String(x.id)!==String(data.id));
+      if(dup) return toast('That type name already exists.','error');
+      data.id ? await DB.update('casting_types', data.id, t) : await DB.create('casting_types', t);
+      toast(data.id?'Casting type updated everywhere':'Casting type added to master','success');
+    }
+
+    if(f.id === 'f-move'){
+      const m = {module:'patterns', reference:data.reference.trim(), item:data.item.trim(), foundry:data.foundry.trim(),
+                 quantity:num(data.quantity), received:Math.min(num(data.quantity), num(data.received)),
+                 dueDate:data.dueDate, status:data.status, notes:data.notes.trim(), changedBy: authUser()};
+      data.id ? await DB.update('control_records', data.id, m) : await DB.create('control_records', m);
+      toast(data.id?'Pattern position updated':'Pattern position added','success');
+    }
+
+    closeModal();
+    await loadAll();
+  }catch(err){ toast(err.message || 'Could not save.','error'); }
+});
+
+/* ==========================================================================
+   8. BACKUP / SEED
+   ========================================================================== */
+document.getElementById('btn-export').addEventListener('click', async () => {
+  const dump = {};
+  for(const c of COLLECTIONS) dump[c] = await DB.list(c);
+  const blob = new Blob([JSON.stringify(dump,null,2)],{type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'jayco-casting-backup-' + today() + '.json';
+  a.click();
+  toast('Backup downloaded','success');
+});
+document.getElementById('btn-import').addEventListener('click', () => {
+  if(!confirm('This will WRITE every record from the backup file into Firestore as new documents. Continue?')) return;
+  document.getElementById('file-import').click();
+});
+document.getElementById('file-import').addEventListener('change', async e => {
+  const file = e.target.files[0]; if(!file) return;
+  try{
+    const dump = JSON.parse(await file.text());
+    let n = 0;
+    for(const c of COLLECTIONS){
+      for(const row of (dump[c]||[])){ const r = {...row}; delete r.id; await DB.create(c, r); n++; }
+    }
+    toast(n + ' records imported into Firestore','success'); loadAll();
+  }catch(err){ toast('Import failed: ' + err.message,'error'); }
+  e.target.value = '';
+});
+document.getElementById('btn-wipe').addEventListener('click', async () => {
+  if(!confirm('Delete ALL casting records from Firestore? This cannot be undone.')) return;
+  if(prompt('Type DELETE to confirm.') !== 'DELETE') return toast('Cancelled','info');
+  try{
+    for(const c of COLLECTIONS){ for(const r of await DB.list(c)) await DB.remove(c, r.id); }
+    toast('All casting data deleted','success'); loadAll();
+  }catch(err){ toast('Delete failed: ' + err.message,'error'); }
+});
+document.getElementById('btn-seed').addEventListener('click', async () => {
+  if(!confirm('Load demo data on top of what is already stored?')) return;
+  for(const t of ['Cap','Base','Housing','Pillow Block','Lock Nut','Adapter Sleeve'])
+    await DB.create('casting_types', {typeName:t, status:'Active', notes:''});
+  const items = [
+    ['SNH 520-617 Housing','Housing','Cast Iron','DRG-520-617','PTN-SNH-520'],
+    ['SNH 520-617 Cap','Cap','Cast Iron','DRG-520-C','PTN-SNH-520'],
+    ['SN 511-609 Base','Base','Cast Iron','DRG-511-B','PTN-SN-511'],
+    ['P 210 Pillow Block','Pillow Block','SG Iron','DRG-P210','PTN-P-210']
+  ];
+  const saved = [];
+  for(const [itemName,itemType,material,drawingNumber,patternCode] of items)
+    saved.push(await DB.create('casting_masters',
+      {itemCode:'CAST-'+Math.random().toString(36).slice(2,10).toUpperCase(), itemName, itemType, material, drawingNumber, patternCode, status:'Active', notes:'', averageWeight:0}));
+  for(const [patternCode,patternName,castingItem] of [
+    ['PTN-SNH-520','SNH 520-617 housing pattern','SNH 520-617 Housing'],
+    ['PTN-SN-511','SN 511-609 base pattern','SN 511-609 Base'],
+    ['PTN-P-210','P 210 pillow block pattern','P 210 Pillow Block']])
+    await DB.create('pattern_masters', {patternCode, patternName, castingItem, patternType:'Split pattern', totalQuantity:2, location:'In-house', status:'Available', notes:''});
+  await DB.create('control_records', {module:'patterns', reference:'PTN-SNH-520', item:'SNH 520-617 housing pattern', foundry:'Bharat Steel Foundry', quantity:2, received:1, dueDate:today(), status:'At foundry', notes:'One set sent for trial casting', changedBy: authUser()});
+  const demoItems = [
+    {itemName:saved[0].itemName, itemType:saved[0].itemType, material:saved[0].material, quantity:50, foundryWeight:1250, actualWeight:1268.5, foundryTotalWeight:1250, actualTotalWeight:1268.5},
+    {itemName:saved[1].itemName, itemType:saved[1].itemType, material:saved[1].material, quantity:50, foundryWeight:640, actualWeight:651.2, foundryTotalWeight:640, actualTotalWeight:651.2}
+  ];
+  await DB.create('casting_challans', {
+    challanNumber:'BSF/CH/1024', challanDate:today(), foundryName:'Bharat Steel Foundry',
+    purchaseOrders:[{purchaseOrderNumber:'JAY/PO/2026/118', purchaseOrderDate:today()}],
+    purchaseOrderNumber:'JAY/PO/2026/118', purchaseOrderDate:today(), status:'Closed',
+    totalQuantity:100, foundryTotalWeight:1890, actualTotalWeight:1919.7, items:demoItems, changedBy: authUser()});
+  toast('Demo data loaded','success');
+  loadAll();
+});
+
+/* ==========================================================================
+   9. BOOT — silent anonymous sign-in, no login screen
+   ========================================================================== */
+const gate     = document.getElementById('gate');
+const gateBody = document.getElementById('gate-body');
+
+function gateMsg(title, sub, extra){
+  gateBody.innerHTML = `<h2>${esc(title)}</h2><p class="sub">${esc(sub)}</p>${extra||''}`;
+}
+
+function gateError(title, sub, hint){
+  gateBody.innerHTML = `<h2>${esc(title)}</h2>
+    <div class="err show">${esc(sub)}</div>
+    ${hint ? `<ol>${hint}</ol>` : ''}
+    <button class="btn primary" id="retry" style="width:100%;justify-content:center;margin-top:1rem">Try again</button>`;
+  document.getElementById('retry').addEventListener('click', () => location.reload());
+}
+
+/* name field */
+const operatorInput = document.getElementById('operator');
+operatorInput.value = operatorName();
+operatorInput.addEventListener('input', e => setOperatorName(e.target.value));
+
+if (location.protocol === 'file:') {
+  gateError('This file must be opened from a web address',
+    'You have opened it directly from your computer (file:///). Firebase blocks sign-in from local files because there is no domain it can authorise.',
+    `<li>Upload <code>index.html</code> to your GitHub repository</li>
+     <li>Repo &rarr; <b>Settings</b> &rarr; <b>Pages</b> &rarr; Branch <b>main</b> / root &rarr; Save</li>
+     <li>Wait 2 minutes, then open the <code>github.io</code> address it gives you</li>
+     <li>Firebase Console &rarr; <b>Authentication</b> &rarr; <b>Settings</b> &rarr;
+         <b>Authorized domains</b> &rarr; add your <code>github.io</code> domain</li>`);
+  throw new Error('file protocol');
+}
+
+try {
+  app  = initializeApp(firebaseConfig);
+  db   = getFirestore(app);
+  auth = getAuth(app);
+
+  gateMsg('Connecting…', 'Starting the shared casting database.');
+
+  onAuthStateChanged(auth, async user => {
+    currentUser = user;
+    if (!user) return;
+    gate.style.display = 'none';
+    try { await loadAll(); }
+    catch(e){ toast('Could not load records: ' + e.message, 'error'); }
+  });
+
+  signInAnonymously(auth).catch(e => {
+    if (e.code === 'auth/admin-restricted-operation' || e.code === 'auth/operation-not-allowed') {
+      gateError('Anonymous sign-in is off',
+        'Firebase is rejecting the automatic sign-in because Anonymous Authentication has not been enabled.',
+        `<li>Firebase Console &rarr; <b>Authentication</b></li>
+         <li><b>Sign-in method</b> tab</li>
+         <li>Click <b>Anonymous</b> &rarr; Enable &rarr; Save</li>
+         <li>Come back here and press Try again</li>`);
+    } else if (e.code === 'auth/unauthorized-domain') {
+      gateError('This web address is not authorised',
+        'Add this exact domain in Firebase.',
+        `<li>Firebase Console &rarr; <b>Authentication</b> &rarr; <b>Settings</b></li>
+         <li><b>Authorized domains</b> &rarr; Add domain</li>
+         <li>Enter <code>${esc(location.hostname)}</code></li>
+         <li>Press Try again</li>`);
+    } else if (e.code === 'auth/configuration-not-found') {
+      gateError('Firebase Authentication is not switched on',
+        'Project "' + firebaseConfig.projectId + '" has no Authentication service yet, so the automatic sign-in has nothing to talk to.',
+        `<li>Firebase Console &rarr; check the project name at the top left says
+             <b>${esc(firebaseConfig.projectId)}</b> &mdash; not a different JAYCO project</li>
+         <li>Left menu &rarr; <b>Build</b> &rarr; <b>Authentication</b></li>
+         <li>Click <b>Get started</b> (this creates the service)</li>
+         <li><b>Sign-in method</b> tab &rarr; <b>Anonymous</b> &rarr; Enable &rarr; Save</li>
+         <li>Press Try again below</li>`);
+    } else if (e.code === 'auth/network-request-failed') {
+      gateError('No connection', 'Could not reach Firebase. Check the internet connection and try again.');
+    } else {
+      gateError('Could not start', e.code ? (e.code + ' — ' + e.message) : e.message);
+    }
+  });
+} catch (e) {
+  gateError('Firebase failed to start', e.message);
+}
+</script>
+</body>
+</html>
